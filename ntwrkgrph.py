@@ -19,22 +19,21 @@ st.markdown("""
         font-family: 'Poppins', sans-serif;
     }
     .sidebar .sidebar-content {
-        background-color: #07B1FC;
-        color: white;
+        background-color: #07B1FC !important;
     }
     .stButton>button {
-        background-color: #06516F;
+        background-color: #06516F !important;
         color: white;
     }
     .stButton>button:hover {
-        background-color: #0098DB;
+        background-color: #0098DB !important;
         color: white;
     }
     .stNumberInput input {
-        border: 2px solid #06516F;
+        border: 2px solid #06516F !important;
     }
     .stNumberInput input:focus {
-        border: 2px solid #0098DB;
+        border: 2px solid #0098DB !important;
     }
     </style>
 """, unsafe_allow_html=True)
