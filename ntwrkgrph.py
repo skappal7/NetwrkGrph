@@ -14,7 +14,7 @@ nltk.download('stopwords')
 # Function to preprocess text
 def preprocess_text(text):
     tokens = word_tokenize(text.lower())
-    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'if', 'because']))
+    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'back','if', 'because', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are', 'was', 'were', 'of', 'for']))
     tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
     return tokens
 
@@ -49,7 +49,7 @@ def create_network_graph(reviews_tokens, keyword=None):
     for tokens in reviews_tokens:
         for i in range(len(tokens[0])):
             for j in range(i + 1, len(tokens[0])):
-                if keyword is None or (tokens[0][i] == keyword or tokens[0][j] == keyword):
+                if keyword is None or keyword == "All" or (tokens[0][i] == keyword or tokens[0][j] == keyword):
                     G.add_edge(tokens[0][i], tokens[0][j])
 
     for word in word_counts:
@@ -84,7 +84,8 @@ if uploaded_file is not None:
     reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
 
     sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
-    keyword = st.selectbox("Select Keyword", sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha())))
+    keyword_options = ["All"] + sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha()))
+    keyword = st.selectbox("Select Keyword", keyword_options)
 
     # Slider for node size scaling
     node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
@@ -140,9 +141,8 @@ if uploaded_file is not None:
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers+text',
-        text=[node for node in G.nodes()],
         textposition="bottom center",
-        hoverinfo='text+text',
+        hoverinfo='text',
         marker=dict(
             showscale=True,
             colorscale='YlGnBu',
@@ -156,7 +156,17 @@ if uploaded_file is not None:
             ),
             line_width=2))
 
-    fig = go.Figure(data=[edge_trace, node_trace],
+    hover_text = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        text=node_text,
+        hoverinfo='text',
+        marker=dict(
+            size=node_size,
+            opacity=0
+        ))
+
+    fig = go.Figure(data=[edge_trace, node_trace, hover_text],
                     layout=go.Layout(
                         title='Network graph of customer reviews',
                         titlefont_size=16,
@@ -173,3 +183,13 @@ if uploaded_file is not None:
     )
 
     st.plotly_chart(fig)
+
+    # Sentiment distribution
+    positive_reviews = reviews[reviews['sentiment'] > 0.1].shape[0]
+    negative_reviews = reviews[reviews['sentiment'] < -0.1].shape[0]
+    neutral_reviews = reviews[(reviews['sentiment'] >= -0.1) & (reviews['sentiment'] <= 0.1)].shape[0]
+
+    st.markdown(f"### Sentiment Distribution")
+    st.markdown(f"😊 Positive Reviews: {positive_reviews}")
+    st.markdown(f"😞 Negative Reviews: {negative_reviews}")
+    st.markdown(f"😐 Neutral Reviews: {neutral_reviews}")
