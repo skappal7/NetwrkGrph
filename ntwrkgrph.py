@@ -11,6 +11,34 @@ import nltk
 nltk.download('punkt')
 nltk.download('stopwords')
 
+# Custom CSS for styling
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+    html, body, [class*="css"] {
+        font-family: 'Poppins', sans-serif;
+    }
+    .sidebar .sidebar-content {
+        background-color: #07B1FC;
+        color: white;
+    }
+    .stButton>button {
+        background-color: #06516F;
+        color: white;
+    }
+    .stButton>button:hover {
+        background-color: #0098DB;
+        color: white;
+    }
+    .stNumberInput input {
+        border: 2px solid #06516F;
+    }
+    .stNumberInput input:focus {
+        border: 2px solid #0098DB;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # Function to preprocess text
 def preprocess_text(text):
     tokens = word_tokenize(text.lower())
@@ -130,6 +158,8 @@ if uploaded_file is not None:
     node_size = []
     node_color = []
 
+    accent_colors = ['#06516F', '#0098DB', '#FAAF3B', '#333333', '#979797']
+
     for node in G.nodes():
         x, y = pos[node]
         node_x.append(x)
@@ -151,9 +181,10 @@ if uploaded_file is not None:
         hoverinfo='text',
         marker=dict(
             showscale=True,
-            colorscale='YlGnBu',
+            colorscale=accent_colors,
             size=node_size,
             color=node_color,
+            line=dict(width=2, color='#06516F'),
             colorbar=dict(
                 thickness=15,
                 title='Node Connections',
