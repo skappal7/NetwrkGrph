@@ -7,6 +7,9 @@ from nltk.corpus import stopwords
 from textblob import TextBlob
 import nltk
 
+# Set the page configuration first
+st.set_page_config(layout="wide")
+
 # Download necessary NLTK data
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -20,6 +23,7 @@ st.markdown("""
     }
     .sidebar .sidebar-content {
         background-color: #07B1FC !important;
+        color: white;
     }
     .stButton>button {
         background-color: #06516F !important;
@@ -98,7 +102,6 @@ def filter_reviews_by_sentiment(reviews, sentiment):
         return reviews[(reviews['sentiment'] >= -0.1) & (reviews['sentiment'] <= 0.1)]
 
 # Streamlit UI
-st.set_page_config(layout="wide")
 st.title("Customer Reviews Network Graph")
 
 with st.sidebar:
