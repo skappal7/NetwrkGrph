@@ -14,7 +14,7 @@ nltk.download('stopwords')
 # Function to preprocess text
 def preprocess_text(text):
     tokens = word_tokenize(text.lower())
-    stop_words = set(stopwords.words('english'))
+    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'if', 'because']))
     tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
     return tokens
 
@@ -23,14 +23,42 @@ def sentiment_analysis(text):
     blob = TextBlob(text)
     return blob.sentiment.polarity
 
+# Function to determine sentiment icon
+def sentiment_icon(sentiment):
+    if sentiment > 0.1:
+        return "😊"
+    elif sentiment < -0.1:
+        return "😞"
+    else:
+        return "😐"
+
 # Function to create a network graph
 def create_network_graph(reviews_tokens, keyword=None):
     G = nx.Graph()
+    word_counts = {}
+    word_sentiments = {}
+
+    for tokens, sentiment in reviews_tokens:
+        for word in tokens:
+            if word not in word_counts:
+                word_counts[word] = 0
+                word_sentiments[word] = []
+            word_counts[word] += 1
+            word_sentiments[word].append(sentiment)
+
     for tokens in reviews_tokens:
-        for i in range(len(tokens)):
-            for j in range(i + 1, len(tokens)):
-                if keyword is None or (tokens[i] == keyword or tokens[j] == keyword):
-                    G.add_edge(tokens[i], tokens[j])
+        for i in range(len(tokens[0])):
+            for j in range(i + 1, len(tokens[0])):
+                if keyword is None or (tokens[0][i] == keyword or tokens[0][j] == keyword):
+                    G.add_edge(tokens[0][i], tokens[0][j])
+
+    for word in word_counts:
+        if word in G:
+            avg_sentiment = sum(word_sentiments[word]) / len(word_sentiments[word])
+            G.nodes[word]['size'] = word_counts[word]
+            G.nodes[word]['sentiment'] = avg_sentiment
+            G.nodes[word]['icon'] = sentiment_icon(avg_sentiment)
+
     return G
 
 # Function to filter reviews by sentiment
@@ -56,14 +84,15 @@ if uploaded_file is not None:
     reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
 
     sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
-    keyword = st.selectbox("Select Keyword", sorted(set(word for tokens in reviews['tokens'] for word in tokens)))
+    keyword = st.selectbox("Select Keyword", sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha())))
 
     # Filter reviews by sentiment
     if sentiment_filter != "All":
         reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
 
     # Create network graph
-    G = create_network_graph(reviews['tokens'], keyword)
+    reviews_tokens = list(zip(reviews['tokens'], reviews['sentiment']))
+    G = create_network_graph(reviews_tokens, keyword)
     pos = nx.spring_layout(G)
 
     # Create Plotly figure
@@ -87,21 +116,35 @@ if uploaded_file is not None:
 
     node_x = []
     node_y = []
+    node_text = []
+    node_size = []
+    node_color = []
+
     for node in G.nodes():
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
+        node_text.append(f"{node}<br>Count: {G.nodes[node]['size']}<br>{G.nodes[node]['icon']}")
+        node_size.append(G.nodes[node]['size'] * 10)
+        sentiment = G.nodes[node]['sentiment']
+        if sentiment > 0.1:
+            node_color.append('green')
+        elif sentiment < -0.1:
+            node_color.append('red')
+        else:
+            node_color.append('gray')
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers+text',
-        text=[node for node in G.nodes()],
+        text=node_text,
         textposition="bottom center",
         hoverinfo='text',
         marker=dict(
             showscale=True,
             colorscale='YlGnBu',
-            size=10,
+            size=node_size,
+            color=node_color,
             colorbar=dict(
                 thickness=15,
                 title='Node Connections',
