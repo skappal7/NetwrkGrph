@@ -71,38 +71,36 @@ def filter_reviews_by_sentiment(reviews, sentiment):
         return reviews[(reviews['sentiment'] >= -0.1) & (reviews['sentiment'] <= 0.1)]
 
 # Streamlit UI
+st.set_page_config(layout="wide")
 st.title("Customer Reviews Network Graph")
-uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 
+with st.sidebar:
+    st.header("Controls")
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+
+    if uploaded_file is not None:
+        reviews = pd.read_csv(uploaded_file)
+        sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
+        keyword_options = ["All"] + sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha()))
+        keyword = st.selectbox("Select Keyword", keyword_options)
+        node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
+        min_occurrence = st.slider("Minimum Word Occurrence", min_value=1, max_value=20, value=1)
+        page_size = st.slider("Page Size", min_value=5, max_value=50, value=10)
+
+        # Preprocess reviews
+        reviews['tokens'] = reviews['text'].apply(preprocess_text)
+        reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
+
+        # Filter reviews by sentiment
+        if sentiment_filter != "All":
+            reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
+
+# Display the review table with pagination
 if uploaded_file is not None:
-    reviews = pd.read_csv(uploaded_file)
-    st.write("Uploaded Reviews:")
-    st.dataframe(reviews)
-
-    # Pagination for review table
-    page_size = 10
     page_number = st.number_input("Page Number", min_value=1, max_value=(len(reviews) // page_size) + 1, step=1)
     start_index = (page_number - 1) * page_size
     end_index = start_index + page_size
     st.write(reviews.iloc[start_index:end_index])
-
-    # Preprocess reviews
-    reviews['tokens'] = reviews['text'].apply(preprocess_text)
-    reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
-
-    sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
-    keyword_options = ["All"] + sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha()))
-    keyword = st.selectbox("Select Keyword", keyword_options)
-
-    # Slider for node size scaling
-    node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
-
-    # Slider for minimum word occurrence
-    min_occurrence = st.slider("Minimum Word Occurrence", min_value=1, max_value=20, value=1)
-
-    # Filter reviews by sentiment
-    if sentiment_filter != "All":
-        reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
 
     # Create network graph
     reviews_tokens = list(zip(reviews['tokens'], reviews['sentiment']))
