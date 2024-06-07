@@ -86,6 +86,9 @@ if uploaded_file is not None:
     sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
     keyword = st.selectbox("Select Keyword", sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha())))
 
+    # Slider for node size scaling
+    node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
+
     # Filter reviews by sentiment
     if sentiment_filter != "All":
         reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
@@ -125,7 +128,7 @@ if uploaded_file is not None:
         node_x.append(x)
         node_y.append(y)
         node_text.append(f"{node}<br>Count: {G.nodes[node]['size']}<br>{G.nodes[node]['icon']}")
-        node_size.append(G.nodes[node]['size'] * 10)
+        node_size.append(G.nodes[node]['size'] * node_size_scale)
         sentiment = G.nodes[node]['sentiment']
         if sentiment > 0.1:
             node_color.append('green')
@@ -137,9 +140,9 @@ if uploaded_file is not None:
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers+text',
-        text=node_text,
+        text=[node for node in G.nodes()],
         textposition="bottom center",
-        hoverinfo='text',
+        hoverinfo='text+text',
         marker=dict(
             showscale=True,
             colorscale='YlGnBu',
