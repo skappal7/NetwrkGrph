@@ -14,7 +14,7 @@ nltk.download('stopwords')
 # Function to preprocess text
 def preprocess_text(text):
     tokens = word_tokenize(text.lower())
-    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'back','if', 'because', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are', 'was', 'were', 'of', 'for']))
+    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'if', 'because', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are', 'was', 'were', 'of', 'for']))
     tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
     return tokens
 
@@ -33,7 +33,7 @@ def sentiment_icon(sentiment):
         return "😐"
 
 # Function to create a network graph
-def create_network_graph(reviews_tokens, keyword=None):
+def create_network_graph(reviews_tokens, keyword=None, min_occurrence=1):
     G = nx.Graph()
     word_counts = {}
     word_sentiments = {}
@@ -49,11 +49,11 @@ def create_network_graph(reviews_tokens, keyword=None):
     for tokens in reviews_tokens:
         for i in range(len(tokens[0])):
             for j in range(i + 1, len(tokens[0])):
-                if keyword is None or keyword == "All" or (tokens[0][i] == keyword or tokens[0][j] == keyword):
+                if (keyword is None or keyword == "All" or tokens[0][i] == keyword or tokens[0][j] == keyword) and word_counts[tokens[0][i]] >= min_occurrence and word_counts[tokens[0][j]] >= min_occurrence:
                     G.add_edge(tokens[0][i], tokens[0][j])
 
     for word in word_counts:
-        if word in G:
+        if word in G and word_counts[word] >= min_occurrence:
             avg_sentiment = sum(word_sentiments[word]) / len(word_sentiments[word])
             G.nodes[word]['size'] = word_counts[word]
             G.nodes[word]['sentiment'] = avg_sentiment
@@ -77,7 +77,14 @@ uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 if uploaded_file is not None:
     reviews = pd.read_csv(uploaded_file)
     st.write("Uploaded Reviews:")
-    st.write(reviews)
+    st.dataframe(reviews)
+
+    # Pagination for review table
+    page_size = 10
+    page_number = st.number_input("Page Number", min_value=1, max_value=(len(reviews) // page_size) + 1, step=1)
+    start_index = (page_number - 1) * page_size
+    end_index = start_index + page_size
+    st.write(reviews.iloc[start_index:end_index])
 
     # Preprocess reviews
     reviews['tokens'] = reviews['text'].apply(preprocess_text)
@@ -90,13 +97,16 @@ if uploaded_file is not None:
     # Slider for node size scaling
     node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
 
+    # Slider for minimum word occurrence
+    min_occurrence = st.slider("Minimum Word Occurrence", min_value=1, max_value=20, value=1)
+
     # Filter reviews by sentiment
     if sentiment_filter != "All":
         reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
 
     # Create network graph
     reviews_tokens = list(zip(reviews['tokens'], reviews['sentiment']))
-    G = create_network_graph(reviews_tokens, keyword)
+    G = create_network_graph(reviews_tokens, keyword, min_occurrence)
     pos = nx.spring_layout(G)
 
     # Create Plotly figure
