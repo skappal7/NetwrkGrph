@@ -80,16 +80,14 @@ with st.sidebar:
 
     if uploaded_file is not None:
         reviews = pd.read_csv(uploaded_file)
+        reviews['tokens'] = reviews['text'].apply(preprocess_text)
+        reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
         sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
         keyword_options = ["All"] + sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha()))
         keyword = st.selectbox("Select Keyword", keyword_options)
         node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
         min_occurrence = st.slider("Minimum Word Occurrence", min_value=1, max_value=20, value=1)
         page_size = st.slider("Page Size", min_value=5, max_value=50, value=10)
-
-        # Preprocess reviews
-        reviews['tokens'] = reviews['text'].apply(preprocess_text)
-        reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
 
         # Filter reviews by sentiment
         if sentiment_filter != "All":
