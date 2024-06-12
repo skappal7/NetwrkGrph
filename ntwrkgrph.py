@@ -45,7 +45,7 @@ st.markdown("""
 # Function to preprocess text
 def preprocess_text(text):
     tokens = word_tokenize(text.lower())
-    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'if', 'because', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are', 'was', 'were', 'of', 'for']))
+    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'if','also','yhis','yrs', 'because', 'ca','would','let','abt','ac','the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are', 'was', 'were', 'of', 'for']))
     tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
     return tokens
 
