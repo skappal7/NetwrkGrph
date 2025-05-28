@@ -7,14 +7,14 @@ from nltk.corpus import stopwords
 from textblob import TextBlob
 import nltk
 
-# Set the page configuration first
+# Set the page config
 st.set_page_config(layout="wide")
 
-# Download necessary NLTK data
+# Download NLTK resources
 nltk.download('punkt')
 nltk.download('stopwords')
 
-# Custom CSS for styling
+# Custom font and UI styling
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
@@ -42,19 +42,21 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Function to preprocess text
-def preprocess_text(text):
+# Preprocessing function
+def preprocess_text(text, excluded):
     tokens = word_tokenize(text.lower())
-    stop_words = set(stopwords.words('english')).union(set(['and', 'or', 'but', 'if','also','yhis','yrs', 'because', 'ca','would','let','abt','ac','the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are', 'was', 'were', 'of', 'for']))
-    tokens = [word for word in tokens if word.isalnum() and word not in stop_words]
-    return tokens
+    custom_stopwords = set(stopwords.words('english')).union({
+        'and', 'or', 'but', 'if', 'also', 'yhis', 'yrs', 'because', 'ca', 'would', 'let',
+        'abt', 'ac', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are',
+        'was', 'were', 'of', 'for'
+    }).union(set(excluded))
+    return [word for word in tokens if word.isalnum() and word not in custom_stopwords]
 
-# Function to perform sentiment analysis
+# Sentiment analysis logic
 def sentiment_analysis(text):
-    blob = TextBlob(text)
-    return blob.sentiment.polarity
+    return TextBlob(text).sentiment.polarity
 
-# Function to determine sentiment icon
+# Emoji-based sentiment icon
 def sentiment_icon(sentiment):
     if sentiment > 0.1:
         return "😊"
@@ -63,7 +65,7 @@ def sentiment_icon(sentiment):
     else:
         return "😐"
 
-# Function to create a network graph
+# Graph creation function
 def create_network_graph(reviews_tokens, keyword=None, min_occurrence=1):
     G = nx.Graph()
     word_counts = {}
@@ -71,164 +73,109 @@ def create_network_graph(reviews_tokens, keyword=None, min_occurrence=1):
 
     for tokens, sentiment in reviews_tokens:
         for word in tokens:
-            if word not in word_counts:
-                word_counts[word] = 0
-                word_sentiments[word] = []
-            word_counts[word] += 1
-            word_sentiments[word].append(sentiment)
+            word_counts[word] = word_counts.get(word, 0) + 1
+            word_sentiments.setdefault(word, []).append(sentiment)
 
-    for tokens in reviews_tokens:
-        for i in range(len(tokens[0])):
-            for j in range(i + 1, len(tokens[0])):
-                if (keyword is None or keyword == "All" or tokens[0][i] == keyword or tokens[0][j] == keyword) and word_counts[tokens[0][i]] >= min_occurrence and word_counts[tokens[0][j]] >= min_occurrence:
-                    G.add_edge(tokens[0][i], tokens[0][j])
+    for tokens, sentiment in reviews_tokens:
+        for i in range(len(tokens)):
+            for j in range(i + 1, len(tokens)):
+                if (keyword == "All" or tokens[i] == keyword or tokens[j] == keyword) and \
+                   word_counts[tokens[i]] >= min_occurrence and word_counts[tokens[j]] >= min_occurrence:
+                    G.add_edge(tokens[i], tokens[j])
 
-    for word in word_counts:
-        if word in G and word_counts[word] >= min_occurrence:
-            avg_sentiment = sum(word_sentiments[word]) / len(word_sentiments[word])
-            G.nodes[word]['size'] = word_counts[word]
-            G.nodes[word]['sentiment'] = avg_sentiment
-            G.nodes[word]['icon'] = sentiment_icon(avg_sentiment)
+    for word in G.nodes():
+        avg_sentiment = sum(word_sentiments[word]) / len(word_sentiments[word])
+        G.nodes[word]['size'] = word_counts[word]
+        G.nodes[word]['sentiment'] = avg_sentiment
+        G.nodes[word]['icon'] = sentiment_icon(avg_sentiment)
 
     return G
 
-# Function to filter reviews by sentiment
-def filter_reviews_by_sentiment(reviews, sentiment):
-    if sentiment == "Positive":
+# Filter reviews by sentiment type
+def filter_reviews_by_sentiment(reviews, sentiment_type):
+    if sentiment_type == "Positive":
         return reviews[reviews['sentiment'] > 0.1]
-    elif sentiment == "Negative":
+    elif sentiment_type == "Negative":
         return reviews[reviews['sentiment'] < -0.1]
-    else:
+    elif sentiment_type == "Neutral":
         return reviews[(reviews['sentiment'] >= -0.1) & (reviews['sentiment'] <= 0.1)]
+    return reviews
 
-# Streamlit UI
-st.title("Customer Reviews Network Graph")
+# Page title
+st.title("📊 Customer Reviews Network Graph")
 
+# Sidebar inputs
 with st.sidebar:
-    st.header("Controls")
+    st.header("⚙️ Controls")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    excluded_words = st.text_input("Exclude Words (comma-separated)", "").lower().split(',')
 
-    if uploaded_file is not None:
+    if uploaded_file:
         reviews = pd.read_csv(uploaded_file)
-        reviews['tokens'] = reviews['text'].apply(preprocess_text)
+
+        # Preprocess
+        reviews['tokens'] = reviews['text'].apply(lambda t: preprocess_text(t, excluded_words))
         reviews['sentiment'] = reviews['text'].apply(sentiment_analysis)
+
         sentiment_filter = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
-        keyword_options = ["All"] + sorted(set(word for tokens in reviews['tokens'] for word in tokens if word.isalpha()))
+        keyword_options = ["All"] + sorted({word for tokens in reviews['tokens'] for word in tokens})
         keyword = st.selectbox("Select Keyword", keyword_options)
-        node_size_scale = st.slider("Adjust Node Size", min_value=1, max_value=20, value=10)
-        min_occurrence = st.slider("Minimum Word Occurrence", min_value=1, max_value=20, value=1)
-        page_size = st.slider("Page Size", min_value=5, max_value=50, value=10)
+        node_size_scale = st.slider("Adjust Node Size", 1, 20, 10)
+        min_occurrence = st.slider("Min Word Occurrence", 1, 20, 1)
+        page_size = st.slider("Page Size", 5, 50, 10)
 
-        # Filter reviews by sentiment
-        if sentiment_filter != "All":
-            reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
+        # Filter sentiment
+        reviews = filter_reviews_by_sentiment(reviews, sentiment_filter)
 
-# Display the review table with pagination
-if uploaded_file is not None:
+# Paginated reviews
+if uploaded_file:
     page_number = st.number_input("Page Number", min_value=1, max_value=(len(reviews) // page_size) + 1, step=1)
-    start_index = (page_number - 1) * page_size
-    end_index = start_index + page_size
-    st.write(reviews.iloc[start_index:end_index])
+    start_idx = (page_number - 1) * page_size
+    end_idx = start_idx + page_size
+    st.write(reviews.iloc[start_idx:end_idx])
 
-    # Create network graph
+    # Build graph
     reviews_tokens = list(zip(reviews['tokens'], reviews['sentiment']))
     G = create_network_graph(reviews_tokens, keyword, min_occurrence)
     pos = nx.spring_layout(G)
 
-    # Create Plotly figure
-    edge_x = []
-    edge_y = []
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x.append(x0)
-        edge_x.append(x1)
-        edge_x.append(None)
-        edge_y.append(y0)
-        edge_y.append(y1)
-        edge_y.append(None)
+    # Edges
+    edge_x, edge_y = [], []
+    for e in G.edges():
+        x0, y0 = pos[e[0]]
+        x1, y1 = pos[e[1]]
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
 
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        line=dict(width=0.5, color='#888'),
-        hoverinfo='none',
-        mode='lines')
+    edge_trace = go.Scatter(x=edge_x, y=edge_y, mode='lines', line=dict(width=0.5, color='#888'), hoverinfo='none')
 
-    node_x = []
-    node_y = []
-    node_text = []
-    node_size = []
-    node_color = []
-
-    accent_colors = ['#06516F', '#0098DB', '#FAAF3B', '#333333', '#979797']
-
+    # Nodes
+    node_x, node_y, node_text, node_size, node_color = [], [], [], [], []
     for node in G.nodes():
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
-        node_text.append(f"{node}<br>Count: {G.nodes[node]['size']}<br>{G.nodes[node]['icon']}")
-        node_size.append(G.nodes[node]['size'] * node_size_scale)
-        sentiment = G.nodes[node]['sentiment']
-        if sentiment > 0.1:
-            node_color.append('green')
-        elif sentiment < -0.1:
-            node_color.append('red')
-        else:
-            node_color.append('gray')
+        s = G.nodes[node]
+        node_text.append(f"{node}<br>Count: {s['size']}<br>{s['icon']}")
+        node_size.append(s['size'] * node_size_scale)
+        node_color.append('green' if s['sentiment'] > 0.1 else 'red' if s['sentiment'] < -0.1 else 'gray')
 
     node_trace = go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers+text',
-        textposition="bottom center",
-        hoverinfo='text',
-        marker=dict(
-            showscale=True,
-            colorscale=accent_colors,
-            size=node_size,
-            color=node_color,
-            line=dict(width=2, color='#06516F'),
-            colorbar=dict(
-                thickness=15,
-                title='Node Connections',
-                xanchor='left',
-                titleside='right'
-            ),
-            line_width=2))
-
-    hover_text = go.Scatter(
-        x=node_x, y=node_y,
-        mode='markers',
-        text=node_text,
-        hoverinfo='text',
-        marker=dict(
-            size=node_size,
-            opacity=0
-        ))
-
-    fig = go.Figure(data=[edge_trace, node_trace, hover_text],
-                    layout=go.Layout(
-                        title='Network graph of customer reviews',
-                        titlefont_size=16,
-                        showlegend=False,
-                        hovermode='closest',
-                        margin=dict(b=20, l=5, r=5, t=40),
-                        xaxis=dict(showgrid=False, zeroline=False),
-                        yaxis=dict(showgrid=False, zeroline=False))
-                    )
-
-    fig.update_layout(
-        dragmode='zoom',  # Enable zoom
-        clickmode='event+select'
+        x=node_x, y=node_y, mode='markers+text',
+        textposition="bottom center", hoverinfo='text', text=node_text,
+        marker=dict(size=node_size, color=node_color, line=dict(width=2, color='#06516F'))
     )
 
-    st.plotly_chart(fig)
+    fig = go.Figure(data=[edge_trace, node_trace],
+                   layout=go.Layout(title='Network graph of customer reviews',
+                                    titlefont_size=16, showlegend=False, hovermode='closest',
+                                    margin=dict(b=20, l=5, r=5, t=40),
+                                    xaxis=dict(showgrid=False, zeroline=False),
+                                    yaxis=dict(showgrid=False, zeroline=False)))
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Sentiment distribution
-    positive_reviews = reviews[reviews['sentiment'] > 0.1].shape[0]
-    negative_reviews = reviews[reviews['sentiment'] < -0.1].shape[0]
-    neutral_reviews = reviews[(reviews['sentiment'] >= -0.1) & (reviews['sentiment'] <= 0.1)].shape[0]
-
-    st.markdown(f"### Sentiment Distribution")
-    st.markdown(f"😊 Positive Reviews: {positive_reviews}")
-    st.markdown(f"😞 Negative Reviews: {negative_reviews}")
-    st.markdown(f"😐 Neutral Reviews: {neutral_reviews}")
+    # Sentiment counts
+    st.subheader("📈 Sentiment Distribution")
+    st.markdown(f"😊 Positive: **{(reviews['sentiment'] > 0.1).sum()}**")
+    st.markdown(f"😞 Negative: **{(reviews['sentiment'] < -0.1).sum()}**")
+    st.markdown(f"😐 Neutral: **{((reviews['sentiment'] >= -0.1) & (reviews['sentiment'] <= 0.1)).sum()}**")
