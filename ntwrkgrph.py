@@ -42,15 +42,25 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Preprocessing function
 def preprocess_text(text, excluded):
-    tokens = word_tokenize(text.lower())
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        nltk.download('punkt')
+    
+    try:
+        tokens = word_tokenize(str(text).lower())
+    except:
+        return []
+
     custom_stopwords = set(stopwords.words('english')).union({
         'and', 'or', 'but', 'if', 'also', 'yhis', 'yrs', 'because', 'ca', 'would', 'let',
         'abt', 'ac', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'with', 'is', 'are',
         'was', 'were', 'of', 'for'
     }).union(set(excluded))
+
     return [word for word in tokens if word.isalnum() and word not in custom_stopwords]
+
 
 # Sentiment analysis logic
 def sentiment_analysis(text):
